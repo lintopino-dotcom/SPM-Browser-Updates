@@ -2,15 +2,18 @@ name: Publish signed browser update
 on:
   push:
     branches: [main]
-    paths: ['manifest.json', 'release-parts/**', '.github/workflows/publish.yml']
+    paths: ['releases/19.9.2/**', '.github/workflows/publish.yml']
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: browser-public-release
+  cancel-in-progress: false
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Download committed distribution files
+      - name: Assemble and verify approved signed release
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -18,25 +21,27 @@ jobs:
         run: |
           mkdir payload
           for i in 0 1 2 3 4; do
-            gh api "repos/$REPO/contents/release-parts/part-$i?ref=$COMMIT" --jq .content | base64 --decode > "payload/part-$i"
+            gh api "repos/$REPO/contents/releases/19.9.2/part-$i?ref=$COMMIT" --jq .content | base64 --decode > "payload/part-$i"
           done
-          cat payload/part-{0,1,2,3,4} > SPM-Browser-19.9.1.apk
-          gh api "repos/$REPO/contents/manifest.json?ref=$COMMIT" --jq .content | base64 --decode > manifest.json
-          echo "957a8044401fdea295d68f1a925d7bd1ecddfa2b96e608f3ef9d2d94b299017b  SPM-Browser-19.9.1.apk" | sha256sum --check
-          python3 -c 'import json,base64,time; p=json.loads(base64.b64decode(json.load(open("manifest.json"))["payload"])); assert p["expiresAt"] > time.time()*1000; assert p["apkSize"] == 3259945'
+          cat payload/part-{0,1,2,3,4} > release.json
+          gh api "repos/$REPO/contents/releases/assemble.py?ref=$COMMIT" --jq .content | base64 --decode > assemble.py
+          python3 assemble.py
+          echo 'MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAsjwf13TGVPuQj1FQXGl0MXS8tf6rP8DDEmSiaRL7n6zSagYN2kKPCaIDEzoBkA5ayZLmUt+eppHCQX75exMGbJLzc/PsMJXRR4FqqoaPIsue35O50ZqgWqi3D/Jj8Kz0QKkHNeMa11eLoWlYQGJ6w4eox/Ye1EviIbZBbhPi0KrjEJKkSMG176coy8VaIxMaBQlyX1PvNTmkJ44TtyD5QtVOU/yEUX+LAAFtTlYALmL5YKuQDyINdNmaMzqFl7A9HS5KpWe3h2AIoPctE+jzV6N1BKvt0SXVVDwy5SNTo8mwzMAb5/9wOScbYpaZoHyd9SxJ0RDJ8oqrZ/Y6gowTZYcLyWrJDfdTxN6R3GndsZdXtTEUqe9IEdqEZ4+UKC13immd7fI6AMHT7kzOXe+WIfIwB29Yq+D/CoGHQDrDEpvhYhLN62NFyXh8P9ZAQCsYTmQ4Vm+EnW1fZ8a+wX8yEQkWX3+46X5S8NeEdHhbrg5NDNjhymt4BYBTKZbfcUBDAgMBAAE=' | base64 --decode > public.der
+          openssl pkey -pubin -inform DER -in public.der -out public.pem
+          openssl dgst -sha256 -verify public.pem -signature manifest.sig manifest.payload
       - name: Publish exact signed files
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view v19.9.1 >/dev/null 2>&1; then
-            gh release upload v19.9.1 SPM-Browser-19.9.1.apk manifest.json --clobber
+          if gh release view v19.9.2 >/dev/null 2>&1; then
+            gh release upload v19.9.2 SPM-Browser-19.9.2.apk manifest.json --clobber
           else
-            gh release create v19.9.1 SPM-Browser-19.9.1.apk manifest.json --title "SPM Browser 19.9.1 — mobile update downloads" --notes "Automatic update downloads over WLAN and mobile data, with WLAN-only and off modes available. Device background behavior still requires verification." --latest
+            gh release create v19.9.2 SPM-Browser-19.9.2.apk manifest.json --title "SPM Browser 19.9.2 – Seitenhilfe" --notes "Schonende Darstellung für ChatGPT, Anmelde-Cookies pro Website und native Hilfe bei Ladefehlern. Netzwerk-Werbefilter werden nicht automatisch abgeschaltet. Build und Signatur geprüft; der konkrete ChatGPT-Login auf Xperia ist noch zu testen." --latest
           fi
-      - name: Verify anonymous public update downloads
+      - name: Verify anonymous public downloads
         run: |
           curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/latest/download/manifest.json" -o public-manifest.json
           cmp manifest.json public-manifest.json
-          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/download/v19.9.1/SPM-Browser-19.9.1.apk" -o public.apk
-          echo "957a8044401fdea295d68f1a925d7bd1ecddfa2b96e608f3ef9d2d94b299017b  public.apk" | sha256sum --check
+          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/download/v19.9.2/SPM-Browser-19.9.2.apk" -o public.apk
+          echo "8d6bed408e7529cbe30ec3f3ddc0081178dbcb2b6e861a2dde8fb9936e09c354  public.apk" | sha256sum --check
