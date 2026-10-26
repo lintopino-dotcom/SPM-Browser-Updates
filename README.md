@@ -1,7 +1,7 @@
 # SPM Browser Updates
 
-Public signed update feed and APK distribution for SPM Browser.
+Signed update distribution for SPM Browser.
 
-Only public distribution files belong here. Never upload private signing keys or passwords.
+Feed: https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/latest/download/manifest.json
 
-Version 19.9.0 is a test release. Device installation and background operation still require verification.
+19.9.0 is a test release; Xperia installation and background operation are not yet verified. The feed must be configured in the app. Signed metadata expires and must be renewed with the private release key, which is never stored here.

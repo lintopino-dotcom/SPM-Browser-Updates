@@ -1,0 +1,36 @@
+name: Publish signed browser update
+on:
+  push:
+    branches: [main]
+    paths: ['manifest.json', 'release-parts/**', '.github/workflows/publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download committed distribution files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          mkdir payload
+          for i in 0 1 2 3 4; do
+            gh api -H "Accept: application/vnd.github.raw+json" "repos/$REPO/contents/release-parts/part-$i?ref=$COMMIT" > "payload/part-$i"
+          done
+          cat payload/part-{0,1,2,3,4} > SPM-Browser-19.9.0-SECURITY-TEST.apk
+          gh api -H "Accept: application/vnd.github.raw+json" "repos/$REPO/contents/manifest.json?ref=$COMMIT" > manifest.json
+          echo "01796b4c1a252088ff06ffa806675f8760be2e369a130b35eaffbd453cb171c8  SPM-Browser-19.9.0-SECURITY-TEST.apk" | sha256sum --check
+          python3 -c 'import json,base64,time; p=json.loads(base64.b64decode(json.load(open("manifest.json"))["payload"])); assert p["expiresAt"] > time.time()*1000; assert p["apkSize"] == 3260048'
+      - name: Publish exact signed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view v19.9.0 >/dev/null 2>&1; then
+            gh release upload v19.9.0 SPM-Browser-19.9.0-SECURITY-TEST.apk manifest.json --clobber
+          else
+            gh release create v19.9.0 SPM-Browser-19.9.0-SECURITY-TEST.apk manifest.json --title "SPM Browser 19.9.0 — security test" --notes "Signed update distribution. Test APK; Xperia installation and background operation are not yet verified." --latest
+          fi
