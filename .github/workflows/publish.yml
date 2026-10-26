@@ -34,3 +34,9 @@ jobs:
           else
             gh release create v19.9.0 SPM-Browser-19.9.0-SECURITY-TEST.apk manifest.json --title "SPM Browser 19.9.0 — security test" --notes "Signed update distribution. Test APK; Xperia installation and background operation are not yet verified." --latest
           fi
+      - name: Verify anonymous public update downloads
+        run: |
+          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/latest/download/manifest.json" -o public-manifest.json
+          cmp manifest.json public-manifest.json
+          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/download/v19.9.0/SPM-Browser-19.9.0-SECURITY-TEST.apk" -o public.apk
+          echo "01796b4c1a252088ff06ffa806675f8760be2e369a130b35eaffbd453cb171c8  public.apk" | sha256sum --check
