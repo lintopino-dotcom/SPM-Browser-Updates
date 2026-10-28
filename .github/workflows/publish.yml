@@ -2,7 +2,7 @@ name: Publish signed browser update
 on:
   push:
     branches: [main]
-    paths: ['releases/19.11.0/**', '.github/workflows/publish.yml']
+    paths: ['releases/19.11.3/**', '.github/workflows/publish.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,11 +20,11 @@ jobs:
           COMMIT: ${{ github.sha }}
         run: |
           mkdir payload
-          for i in $(seq 0 22); do
-            gh api "repos/$REPO/contents/releases/19.11.0/part-$i?ref=$COMMIT" --jq .content | base64 --decode > "payload/part-$i"
+          for i in $(seq 0 1); do
+            gh api "repos/$REPO/contents/releases/19.11.3/part-$i?ref=$COMMIT" --jq .content | base64 --decode > "payload/part-$i"
           done
-          for i in $(seq 0 22); do cat "payload/part-$i"; done > release.json
-          gh api "repos/$REPO/contents/releases/assemble-19.11.0.py?ref=$COMMIT" --jq .content | base64 --decode > assemble.py
+          for i in $(seq 0 1); do cat "payload/part-$i"; done > release.json
+          gh api "repos/$REPO/contents/releases/assemble-19.11.3.py?ref=$COMMIT" --jq .content | base64 --decode > assemble.py
           python3 assemble.py
           echo 'MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAsjwf13TGVPuQj1FQXGl0MXS8tf6rP8DDEmSiaRL7n6zSagYN2kKPCaIDEzoBkA5ayZLmUt+eppHCQX75exMGbJLzc/PsMJXRR4FqqoaPIsue35O50ZqgWqi3D/Jj8Kz0QKkHNeMa11eLoWlYQGJ6w4eox/Ye1EviIbZBbhPi0KrjEJKkSMG176coy8VaIxMaBQlyX1PvNTmkJ44TtyD5QtVOU/yEUX+LAAFtTlYALmL5YKuQDyINdNmaMzqFl7A9HS5KpWe3h2AIoPctE+jzV6N1BKvt0SXVVDwy5SNTo8mwzMAb5/9wOScbYpaZoHyd9SxJ0RDJ8oqrZ/Y6gowTZYcLyWrJDfdTxN6R3GndsZdXtTEUqe9IEdqEZ4+UKC13immd7fI6AMHT7kzOXe+WIfIwB29Yq+D/CoGHQDrDEpvhYhLN62NFyXh8P9ZAQCsYTmQ4Vm+EnW1fZ8a+wX8yEQkWX3+46X5S8NeEdHhbrg5NDNjhymt4BYBTKZbfcUBDAgMBAAE=' | base64 --decode > public.der
           openssl pkey -pubin -inform DER -in public.der -out public.pem
@@ -34,14 +34,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view v19.11.0 >/dev/null 2>&1; then
-            gh release upload v19.11.0 SPM-Browser-19.11.0.apk manifest.json --clobber
+          if gh release view v19.11.3 >/dev/null 2>&1; then
+            gh release upload v19.11.3 SPM-Browser-19.11.3.apk manifest.json --clobber
           else
-            gh release create v19.11.0 SPM-Browser-19.11.0.apk manifest.json --title "SPM Browser 19.11.0 – Bildstudio und Vitrinenlicht" --notes "Offline-Texterkennung Deutsch und Englisch, Screenshot mit Stift, Pfeilen, Rahmen, Notizen und Ausschnitt als PNG speichern oder teilen. Vitrinen-Beleuchtung pro Memory Card. Sieben Themes mit originalen Wortmarken. Werbefilter und signierte Updates bleiben erhalten. Oberfläche und Signatur geprüft; Xperia-Gerätetest steht aus." --latest
+            gh release create v19.11.3 SPM-Browser-19.11.3.apk manifest.json --title "SPM Browser 19.11.3 – Stabilität und Ressourcenpflege" --notes "Gezielte Stabilitäts- und Ressourcenpflege: weniger unnötige Starthub-Callbacks, pausierte Arbeit in inaktiven Ansichten, speicherschonenderer Bildimport, serialisierte Update-Downloads und zuverlässigere Ressourcenfreigabe. Keine neuen Funktionen oder Designänderungen. Bestehende Funktions- und Signaturprüfungen bestanden; Xperia-Gerätetest und Akkumessung stehen aus." --latest
           fi
       - name: Verify anonymous public downloads
         run: |
           curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/latest/download/manifest.json" -o public-manifest.json
           cmp manifest.json public-manifest.json
-          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/download/v19.11.0/SPM-Browser-19.11.0.apk" -o public.apk
-          echo "3154284414c7d1eec1100a4c9afbcf90df734c856c8a85a0b75c95971c8f2488  public.apk" | sha256sum --check
+          curl --fail --location --retry 5 --retry-delay 3 "https://github.com/lintopino-dotcom/SPM-Browser-Updates/releases/download/v19.11.3/SPM-Browser-19.11.3.apk" -o public.apk
+          echo "106f34c0fca79048e78ceb85bd1ad7b8ae958ccfcb65c4eb0d038809ab471477  public.apk" | sha256sum --check
