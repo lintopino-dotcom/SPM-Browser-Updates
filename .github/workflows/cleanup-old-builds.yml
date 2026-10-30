@@ -1,0 +1,30 @@
+name: Alte APK-Builds automatisch bereinigen
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: cleanup-old-builds
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Alte abgeschlossene Durchlaeufe entfernen
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {owner, repo, per_page:100});
+            const appRuns = runs.filter(r => r.name !== 'Alte APK-Builds automatisch bereinigen');
+            appRuns.sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id-a.id);
+            const newest = appRuns[0];
+            core.info(`Neuster App-Durchlauf: ${newest?.id ?? 'keiner'}`);
+            for (const run of runs) {
+              if (run.id === context.runId || run.id === newest?.id || run.status !== 'completed') continue;
+              await github.rest.actions.deleteWorkflowRun({owner,repo,run_id:run.id});
+              core.info(`Alter Durchlauf geloescht: ${run.id}`);
+            }
