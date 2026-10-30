@@ -13,18 +13,34 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Alte abgeschlossene Durchlaeufe entfernen
+      - name: Pro Build-Workflow neuesten Durchlauf behalten
         uses: actions/github-script@v7
         with:
           script: |
-            const {owner, repo} = context.repo;
-            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {owner, repo, per_page:100});
-            const appRuns = runs.filter(r => r.name !== 'Alte APK-Builds automatisch bereinigen');
-            appRuns.sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id-a.id);
-            const newest = appRuns[0];
-            core.info(`Neuster App-Durchlauf: ${newest?.id ?? 'keiner'}`);
-            for (const run of runs) {
-              if (run.id === context.runId || run.id === newest?.id || run.status !== 'completed') continue;
-              await github.rest.actions.deleteWorkflowRun({owner,repo,run_id:run.id});
-              core.info(`Alter Durchlauf geloescht: ${run.id}`);
+            const { owner, repo } = context.repo;
+            const all = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, { owner, repo, per_page: 100 });
+            const cleanupId = context.workflow;
+            const newestByWorkflow = new Map();
+            for (const run of all) {
+              if (run.name === cleanupId || run.workflow_id === context.workflow_id) continue;
+              const key = run.workflow_id;
+              const prev = newestByWorkflow.get(key);
+              if (!prev || Date.parse(run.created_at) > Date.parse(prev.created_at) ||
+                  (run.created_at === prev.created_at && run.id > prev.id)) {
+                newestByWorkflow.set(key, run);
+              }
             }
+            const keep = new Set([...newestByWorkflow.values()].map(r => r.id));
+            core.info('Keeping latest run for each build workflow: ' + [...keep].join(', '));
+            let failed = 0;
+            for (const run of all) {
+              if (run.id === context.runId || run.status !== 'completed' || keep.has(run.id)) continue;
+              try {
+                await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id });
+                core.info('Deleted older run ' + run.id);
+              } catch (error) {
+                failed++;
+                core.warning('Could not delete run ' + run.id + ': ' + error.message);
+              }
+            }
+            if (failed) core.setFailed(failed + ' old workflow runs could not be deleted.');
