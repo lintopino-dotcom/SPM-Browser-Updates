@@ -1,5 +1,8 @@
 name: Alte APK-Builds automatisch bereinigen
 on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-old-builds.yml'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
